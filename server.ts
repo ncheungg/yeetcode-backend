@@ -1,80 +1,119 @@
-import { WebSocket, WebSocketServer } from "ws";
-import { v4 as uuidv4 } from "uuid";
+import { WebSocketServer } from 'ws';
+import { v4 as uuidv4 } from 'uuid';
 import {
   SocketMessageData,
   SocketMessageDataType,
   SocketMessageDataParams,
   Rooms,
-} from "./types";
-import { MAX_ROOM_SIZE } from "./consts";
+  WebSocket,
+} from './types';
+import { MAX_ROOM_SIZE } from './consts';
 
 const PORT = 1234;
 const wss = new WebSocketServer({ port: PORT });
 
-// { "type": "create", "params": {}}
-
-// { "type": "join",
-// 	"params": {
-// 		"code": "code"
-// 	}
-// }
-
-// { "type": "leave", "params": {}}
-
 const rooms: Rooms = {};
 
-const createRoom = (ws: WebSocket): string => {
-  let roomId;
+const broadcastMessage = (
+  ws: WebSocket,
+  message: SocketMessageData
+): boolean => {
+  const { roomID } = ws;
 
-  while (!roomId || rooms[roomId] !== undefined) {
-    roomId = uuidv4();
+  if (!roomID || rooms[roomID] === undefined) return false;
+
+  for (const wsClient of rooms[roomID]) {
+    wsClient.send(message);
   }
 
-  // @ts-ignore
-  ws.room = roomId;
-  rooms[roomId] = [ws];
+  return true;
+};
 
-  return roomId;
+const createRoom = (ws: WebSocket): string => {
+  let roomID;
+
+  while (!roomID || rooms[roomID] !== undefined) {
+    roomID = uuidv4();
+  }
+
+  ws.roomID = roomID;
+  rooms[roomID] = [ws];
+
+  const { userID } = ws;
+  const message: SocketMessageData = {
+    type: SocketMessageDataType.Action,
+    params: {
+      message: `${userID} created a room!`,
+    },
+  };
+
+  broadcastMessage(ws, message);
+
+  return roomID;
 };
 
 const joinRoom = (ws: WebSocket, params: SocketMessageDataParams): boolean => {
-  const { roomId } = params;
+  const { roomID } = params;
 
   if (
-    !roomId ||
-    rooms[roomId] === undefined ||
-    rooms[roomId].length >= MAX_ROOM_SIZE
+    !roomID ||
+    rooms[roomID] === undefined ||
+    rooms[roomID].length >= MAX_ROOM_SIZE
   )
     return false;
 
-  // @ts-ignore
-  ws.room = roomId;
-  rooms[roomId].push(ws);
+  ws.roomID = roomID;
+  rooms[roomID].push(ws);
+
+  const { userID } = ws;
+  const message: SocketMessageData = {
+    type: SocketMessageDataType.Action,
+    params: {
+      message: `${userID} joined the room!`,
+    },
+  };
+
+  broadcastMessage(ws, message);
+
   return true;
 };
 
 const leaveRoom = (ws: WebSocket): boolean => {
-  // @ts-ignore
-  const roomId: string = ws.room;
+  const roomID: string | undefined = ws.roomID;
 
   if (
-    !roomId ||
-    rooms[roomId] === undefined ||
-    rooms[roomId].indexOf(ws) === -1
+    !roomID ||
+    rooms[roomID] === undefined ||
+    rooms[roomID].indexOf(ws) === -1
   )
     return false;
 
-  rooms[roomId].filter((item) => item !== ws);
+  rooms[roomID].filter((item) => item !== ws);
+  if (rooms[roomID].length === 0) {
+    delete rooms[roomID];
+    return true;
+  }
+
+  const { userID } = ws;
+  const message: SocketMessageData = {
+    type: SocketMessageDataType.Action,
+    params: {
+      message: `${userID} left the room!`,
+    },
+  };
+
+  broadcastMessage(ws, message);
+
   return true;
 };
 
 // handles websocket connections/messages
-wss.on("connection", (ws: WebSocket) => {
-  console.log("connected with a socket!");
-  console.log(typeof ws);
+wss.on('connection', (ws: WebSocket) => {
+  console.log('connected with a socket!');
+  console.log(ws);
 
   // action handler
-  ws.on("message", (data: string) => {
+  ws.on('message', (data: string) => {
     const { type, params } = JSON.parse(data) as SocketMessageData;
 
     switch (type) {
@@ -86,6 +125,11 @@ wss.on("connection", (ws: WebSocket) => {
         break;
       case SocketMessageDataType.Leave:
         leaveRoom(ws);
+        break;
+      case SocketMessageDataType.Message:
+        broadcastMessage(ws, { type, params });
+        break;
+      case SocketMessageDataType.Action:
         break;
     }
   });
