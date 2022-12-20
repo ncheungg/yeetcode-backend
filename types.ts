@@ -5,7 +5,7 @@ export interface WebSocket extends WebSocketOld {
   userID?: string;
 }
 
-export enum SocketMessageDataType {
+export enum SocketMessageType {
   Create = 'create',
   Join = 'join',
   Leave = 'leave',
@@ -13,14 +13,14 @@ export enum SocketMessageDataType {
   Action = 'action',
 }
 
-export interface SocketMessageDataParams {
+export interface SocketMessageParams {
   roomID?: string;
   message?: string;
 }
 
-export interface SocketMessageData {
-  type: SocketMessageDataType;
-  params: SocketMessageDataParams;
+export interface SocketMessage {
+  type: SocketMessageType;
+  params: SocketMessageParams;
 }
 
 export interface Rooms {

@@ -1,9 +1,9 @@
 import { WebSocketServer } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  SocketMessageData,
-  SocketMessageDataType,
-  SocketMessageDataParams,
+  SocketMessage,
+  SocketMessageType,
+  SocketMessageParams,
   Rooms,
   WebSocket,
 } from './types';
@@ -14,7 +14,7 @@ const rooms: Rooms = {};
 
 const broadcastMessage = (
   ws: WebSocket,
-  message: SocketMessageData
+  message: SocketMessage
 ): boolean => {
   const { roomID } = ws;
 
@@ -30,7 +30,7 @@ const broadcastMessage = (
 
 const broadcastAction = (
   ws: WebSocket,
-  message: SocketMessageData
+  message: SocketMessage
 ): boolean => {
   const { roomID } = ws;
 
@@ -54,8 +54,8 @@ const createRoom = (ws: WebSocket): string => {
   rooms[roomID] = [ws];
 
   const { userID } = ws;
-  const message: SocketMessageData = {
-    type: SocketMessageDataType.Action,
+  const message: SocketMessage = {
+    type: SocketMessageType.Action,
     params: {
       message: `${userID} created a room!`,
     },
@@ -66,7 +66,7 @@ const createRoom = (ws: WebSocket): string => {
   return roomID;
 };
 
-const joinRoom = (ws: WebSocket, params: SocketMessageDataParams): boolean => {
+const joinRoom = (ws: WebSocket, params: SocketMessageParams): boolean => {
   const { roomID } = params;
 
   if (
@@ -80,8 +80,8 @@ const joinRoom = (ws: WebSocket, params: SocketMessageDataParams): boolean => {
   rooms[roomID].push(ws);
 
   const { userID } = ws;
-  const message: SocketMessageData = {
-    type: SocketMessageDataType.Action,
+  const message: SocketMessage = {
+    type: SocketMessageType.Action,
     params: {
       message: `${userID} joined the room!`,
     },
@@ -109,8 +109,8 @@ const leaveRoom = (ws: WebSocket): boolean => {
   }
 
   const { userID } = ws;
-  const message: SocketMessageData = {
-    type: SocketMessageDataType.Action,
+  const message: SocketMessage = {
+    type: SocketMessageType.Action,
     params: {
       message: `${userID} left the room!`,
     },
@@ -128,22 +128,22 @@ wss.on('connection', (ws: WebSocket) => {
 
   // action handler
   ws.on('message', (data: string) => {
-    const { type, params } = JSON.parse(data) as SocketMessageData;
+    const { type, params } = JSON.parse(data) as SocketMessage;
 
     switch (type) {
-      case SocketMessageDataType.Create:
+      case SocketMessageType.Create:
         createRoom(ws);
         break;
-      case SocketMessageDataType.Join:
+      case SocketMessageType.Join:
         joinRoom(ws, params);
         break;
-      case SocketMessageDataType.Leave:
+      case SocketMessageType.Leave:
         leaveRoom(ws);
         break;
-      case SocketMessageDataType.Message:
+      case SocketMessageType.Message:
         broadcastMessage(ws, { type, params });
         break;
-      case SocketMessageDataType.Action:
+      case SocketMessageType.Action:
         broadcastAction(ws, { type, params });
         break;
     }
