@@ -7,14 +7,28 @@ import {
   Rooms,
   WebSocket,
 } from './types';
-import { MAX_ROOM_SIZE } from './consts';
+import { MAX_ROOM_SIZE, PORT } from './consts';
 
-const PORT = 1234;
 const wss = new WebSocketServer({ port: PORT });
-
 const rooms: Rooms = {};
 
 const broadcastMessage = (
+  ws: WebSocket,
+  message: SocketMessageData
+): boolean => {
+  const { roomID } = ws;
+
+  if (!roomID || rooms[roomID] === undefined) return false;
+
+  for (const wsClient of rooms[roomID]) {
+    if (wsClient === ws) continue;
+    wsClient.send(message);
+  }
+
+  return true;
+};
+
+const broadcastAction = (
   ws: WebSocket,
   message: SocketMessageData
 ): boolean => {
@@ -47,7 +61,7 @@ const createRoom = (ws: WebSocket): string => {
     },
   };
 
-  broadcastMessage(ws, message);
+  broadcastAction(ws, message);
 
   return roomID;
 };
@@ -73,7 +87,7 @@ const joinRoom = (ws: WebSocket, params: SocketMessageDataParams): boolean => {
     },
   };
 
-  broadcastMessage(ws, message);
+  broadcastAction(ws, message);
 
   return true;
 };
@@ -102,7 +116,7 @@ const leaveRoom = (ws: WebSocket): boolean => {
     },
   };
 
-  broadcastMessage(ws, message);
+  broadcastAction(ws, message);
 
   return true;
 };
@@ -130,6 +144,7 @@ wss.on('connection', (ws: WebSocket) => {
         broadcastMessage(ws, { type, params });
         break;
       case SocketMessageDataType.Action:
+        broadcastAction(ws, { type, params });
         break;
     }
   });
