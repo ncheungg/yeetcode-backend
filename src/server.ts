@@ -89,7 +89,9 @@ const createRoom = (ws: WebSocket): void => {
   ws.send(createRoomMessage);
 };
 
-const joinRoom = (ws: WebSocket, params: SocketMessageParams): boolean => {
+const joinRoom = (ws: WebSocket, params?: SocketMessageParams): boolean => {
+  if (!params) return false;
+
   const { roomId } = params;
   const { userId } = ws;
 
@@ -233,6 +235,14 @@ const playerFinished = (ws: WebSocket): boolean => {
   };
   broadcastToRoom(roomId, message);
 
+  // check if there are still people playing
+  for (const state of Object.values(rooms[roomId].socketGameState)) {
+    if (state === UserGameState.Playing) return true;
+  }
+
+  // if no one else is playing, we end the game
+  endGame(roomId);
+
   return true;
 };
 
@@ -288,7 +298,7 @@ const broadcastSolutions = (ws: WebSocket): boolean => {
   return true;
 };
 
-const broadcastSubmit = (ws: WebSocket): boolean => {
+const playerSubmit = (ws: WebSocket): boolean => {
   const { userId } = ws;
   const roomId = userToRoom[userId];
 
@@ -320,11 +330,21 @@ const startGame = (roomId: string): boolean => {
   const problem = getRandomProblemForRoom(roomId);
   if (!problem) return false;
 
+  const expiryDate = new Date(new Date().getTime() + PROBLEM_TIME * 60000);
+
+  // creates a timer that automatically ends the game once timer exceeded
+  // adds 5 extra seconds to round expiry date
+  const delayInMs = expiryDate.getTime() - Date.now() + 5000;
+  const timeoutId = setTimeout(() => {
+    endGame(roomId);
+  }, delayInMs);
+
   const round: Round = {
     problem: problem,
-    expiryDate: new Date(new Date().getTime() + PROBLEM_TIME * 60000),
+    expiryDate,
     finishedOrder: [],
     forfeited: [],
+    timeoutId,
   };
 
   rooms[roomId].isInGame = true;
@@ -338,7 +358,7 @@ const startGame = (roomId: string): boolean => {
 
   // sends the problem and its details to all users
   const problemMessage: SocketMessage = {
-    type: SocketMessageType.Problem,
+    type: SocketMessageType.StartGame,
     params: {
       problem: problem,
     },
@@ -358,8 +378,12 @@ const startGame = (roomId: string): boolean => {
   return true;
 };
 
-const finishGame = (roomId: string): boolean => {
+const endGame = (roomId: string): boolean => {
   if (!roomId || !rooms[roomId]) return false;
+
+  // clear the round timer
+  const timeoutId = rooms[roomId].round?.timeoutId;
+  clearTimeout(timeoutId);
 
   delete rooms[roomId].round;
   rooms[roomId].isInGame = false;
@@ -369,14 +393,21 @@ const finishGame = (roomId: string): boolean => {
     rooms[roomId].socketGameState[user] = UserGameState.Unready;
   }
 
-  const message: SocketMessage = {
+  // sends a message to all sockets to end the game
+  const endMessage: SocketMessage = {
+    type: SocketMessageType.EndGame,
+    ts: new Date(),
+  };
+  broadcastToRoom(roomId, endMessage);
+
+  const actionMessage: SocketMessage = {
     type: SocketMessageType.Action,
     params: {
       message: 'Game finished!',
     },
     ts: new Date(),
   };
-  broadcastToRoom(roomId, message);
+  broadcastToRoom(roomId, actionMessage);
 
   return true;
 };
@@ -421,6 +452,14 @@ const playerForfeit = (ws: WebSocket): boolean => {
     ts: new Date(),
   };
   broadcastToRoom(roomId, message);
+
+  // check if there are still people playing
+  for (const state of Object.values(rooms[roomId].socketGameState)) {
+    if (state === UserGameState.Playing) return true;
+  }
+
+  // if no one else is playing, we end the game
+  endGame(roomId);
 
   return true;
 };
@@ -503,7 +542,7 @@ wss.on('connection', (ws: WebSocket) => {
         break;
 
       case SocketMessageType.Submit:
-        broadcastSubmit(ws);
+        playerSubmit(ws);
         break;
 
       case SocketMessageType.Ready:

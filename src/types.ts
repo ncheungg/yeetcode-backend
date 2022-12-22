@@ -18,7 +18,8 @@ export enum SocketMessageType {
   Action,
   Ready,
   Unready,
-  Problem,
+  StartGame,
+  EndGame,
   Forfeit,
 }
 
@@ -39,7 +40,7 @@ export interface SocketMessageParams {
 
 export interface SocketMessage {
   type: SocketMessageType;
-  params: SocketMessageParams;
+  params?: SocketMessageParams;
   ts: Date;
 }
 
@@ -63,6 +64,7 @@ export interface Round {
   expiryDate: Date;
   finishedOrder: WebSocket[];
   forfeited: WebSocket[];
+  timeoutId: NodeJS.Timeout;
 }
 
 export interface Room {
