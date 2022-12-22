@@ -583,7 +583,10 @@ wss.on('connection', (ws: WebSocket) => {
 // https://www.npmjs.com/package/ws#how-to-detect-and-close-broken-connections
 const interval = setInterval(() => {
   for (const ws of wss.clients as Set<WebSocket>) {
-    if (ws.isAlive === false) return ws.terminate();
+    if (ws.isAlive === false) {
+      leaveRoom(ws);
+      return ws.terminate();
+    }
 
     ws.isAlive = false;
     ws.ping();
