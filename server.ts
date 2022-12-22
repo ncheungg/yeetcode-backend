@@ -19,6 +19,7 @@ const wss = new WebSocketServer({ port: PORT });
 const rooms: Rooms = {};
 const userToRoom: UserToRoom = {};
 
+// broadcasts a user message to all sockets except for itself
 const broadcastMessage = (ws: WebSocket, message: SocketMessage): boolean => {
   const roomId = userToRoom[ws.userId];
 
@@ -32,7 +33,8 @@ const broadcastMessage = (ws: WebSocket, message: SocketMessage): boolean => {
   return true;
 };
 
-const broadcastAction = (
+// broadcasts to everyone in the room
+const broadcastToRoom = (
   roomId: string | undefined,
   message: SocketMessage
 ): boolean => {
@@ -45,7 +47,7 @@ const broadcastAction = (
   return true;
 };
 
-// creates a room, broadcasts action message, returns roomId to socket
+// creates a room, broadcasts action message, sends roomId back to socket
 const createRoom = (ws: WebSocket): void => {
   const { userId } = ws;
   let roomId: string | undefined;
@@ -75,7 +77,7 @@ const createRoom = (ws: WebSocket): void => {
     },
     ts: new Date(),
   };
-  broadcastAction(roomId, actionMessage);
+  broadcastToRoom(roomId, actionMessage);
 
   const createRoomMessage: SocketMessage = {
     type: SocketMessageType.Create,
@@ -113,7 +115,7 @@ const joinRoom = (ws: WebSocket, params: SocketMessageParams): boolean => {
     },
     ts: new Date(),
   };
-  broadcastAction(roomId, actionMessage);
+  broadcastToRoom(roomId, actionMessage);
 
   return true;
 };
@@ -148,14 +150,24 @@ const leaveRoom = (ws: WebSocket): boolean => {
     },
     ts: new Date(),
   };
-  broadcastAction(roomId, message);
+  broadcastToRoom(roomId, message);
 
   return true;
 };
 
-const broadcastDiscussion = (ws: WebSocket): void => {
+const broadcastDiscussion = (ws: WebSocket): boolean => {
   const { userId } = ws;
   const roomId = userToRoom[userId];
+
+  // only broadcast this action if user in game and user is still playing
+  if (
+    !roomId ||
+    !rooms[roomId] ||
+    !rooms[roomId].isInGame ||
+    !rooms[roomId].round ||
+    rooms[roomId].socketGameState[userId] !== UserGameState.Playing
+  )
+    return false;
 
   const message: SocketMessage = {
     type: SocketMessageType.Action,
@@ -164,12 +176,24 @@ const broadcastDiscussion = (ws: WebSocket): void => {
     },
     ts: new Date(),
   };
-  broadcastAction(roomId, message);
+  broadcastToRoom(roomId, message);
+
+  return true;
 };
 
-const broadcastFailed = (ws: WebSocket): void => {
+const broadcastFailed = (ws: WebSocket): boolean => {
   const { userId } = ws;
   const roomId = userToRoom[userId];
+
+  // only broadcast this action if user in game and user is still playing
+  if (
+    !roomId ||
+    !rooms[roomId] ||
+    !rooms[roomId].isInGame ||
+    !rooms[roomId].round ||
+    rooms[roomId].socketGameState[userId] !== UserGameState.Playing
+  )
+    return false;
 
   const message: SocketMessage = {
     type: SocketMessageType.Action,
@@ -178,15 +202,24 @@ const broadcastFailed = (ws: WebSocket): void => {
     },
     ts: new Date(),
   };
-  broadcastAction(roomId, message);
+  broadcastToRoom(roomId, message);
+
+  return true;
 };
 
-const playerFinished = (ws: WebSocket): void => {
+const playerFinished = (ws: WebSocket): boolean => {
   const { userId } = ws;
   const roomId = userToRoom[userId];
 
-  if (!roomId || !rooms[roomId] || !rooms[roomId].socketGameState[userId])
-    return;
+  // only broadcast this action if user in game and user is still playing
+  if (
+    !roomId ||
+    !rooms[roomId] ||
+    !rooms[roomId].isInGame ||
+    !rooms[roomId].round ||
+    rooms[roomId].socketGameState[userId] !== UserGameState.Playing
+  )
+    return false;
 
   rooms[roomId].round?.finishedOrder.push(ws);
   rooms[roomId].socketGameState[userId] = UserGameState.Finished;
@@ -198,12 +231,24 @@ const playerFinished = (ws: WebSocket): void => {
     },
     ts: new Date(),
   };
-  broadcastAction(roomId, message);
+  broadcastToRoom(roomId, message);
+
+  return true;
 };
 
-const broadcastHint = (ws: WebSocket): void => {
+const broadcastHint = (ws: WebSocket): boolean => {
   const { userId } = ws;
   const roomId = userToRoom[userId];
+
+  // only broadcast this action if user in game and user is still playing
+  if (
+    !roomId ||
+    !rooms[roomId] ||
+    !rooms[roomId].isInGame ||
+    !rooms[roomId].round ||
+    rooms[roomId].socketGameState[userId] !== UserGameState.Playing
+  )
+    return false;
 
   const message: SocketMessage = {
     type: SocketMessageType.Action,
@@ -212,12 +257,24 @@ const broadcastHint = (ws: WebSocket): void => {
     },
     ts: new Date(),
   };
-  broadcastAction(roomId, message);
+  broadcastToRoom(roomId, message);
+
+  return true;
 };
 
-const broadcastSolutions = (ws: WebSocket): void => {
+const broadcastSolutions = (ws: WebSocket): boolean => {
   const { userId } = ws;
   const roomId = userToRoom[userId];
+
+  // only broadcast this action if user in game and user is still playing
+  if (
+    !roomId ||
+    !rooms[roomId] ||
+    !rooms[roomId].isInGame ||
+    !rooms[roomId].round ||
+    rooms[roomId].socketGameState[userId] !== UserGameState.Playing
+  )
+    return false;
 
   const message: SocketMessage = {
     type: SocketMessageType.Action,
@@ -226,12 +283,24 @@ const broadcastSolutions = (ws: WebSocket): void => {
     },
     ts: new Date(),
   };
-  broadcastAction(roomId, message);
+  broadcastToRoom(roomId, message);
+
+  return true;
 };
 
-const broadcastSubmit = (ws: WebSocket): void => {
+const broadcastSubmit = (ws: WebSocket): boolean => {
   const { userId } = ws;
   const roomId = userToRoom[userId];
+
+  // only broadcast this action if user in game and user is still playing
+  if (
+    !roomId ||
+    !rooms[roomId] ||
+    !rooms[roomId].isInGame ||
+    !rooms[roomId].round ||
+    rooms[roomId].socketGameState[userId] !== UserGameState.Playing
+  )
+    return false;
 
   const message: SocketMessage = {
     type: SocketMessageType.Action,
@@ -240,17 +309,22 @@ const broadcastSubmit = (ws: WebSocket): void => {
     },
     ts: new Date(),
   };
-  broadcastAction(roomId, message);
+  broadcastToRoom(roomId, message);
+
+  return true;
 };
 
-const startGame = (roomId: string): void => {
+const startGame = (roomId: string): boolean => {
+  if (!roomId || !rooms[roomId]) return false;
+
   const problem = getRandomProblemForRoom(roomId);
-  if (!problem) return;
+  if (!problem) return false;
 
   const round: Round = {
     problem: problem,
     expiryDate: new Date(new Date().getTime() + PROBLEM_TIME * 60000),
     finishedOrder: [],
+    forfeited: [],
   };
 
   rooms[roomId].isInGame = true;
@@ -262,14 +336,49 @@ const startGame = (roomId: string): void => {
     rooms[roomId].socketGameState[user] = UserGameState.Playing;
   }
 
-  const message: SocketMessage = {
-    type: SocketMessageType.Action,
+  // sends the problem and its details to all users
+  const problemMessage: SocketMessage = {
+    type: SocketMessageType.Problem,
     params: {
-      message: '🏁 Game started! 🏁',
+      problem: problem,
     },
     ts: new Date(),
   };
-  broadcastAction(roomId, message);
+  broadcastToRoom(roomId, problemMessage);
+
+  const actionMessage: SocketMessage = {
+    type: SocketMessageType.Action,
+    params: {
+      message: 'Game started!',
+    },
+    ts: new Date(),
+  };
+  broadcastToRoom(roomId, actionMessage);
+
+  return true;
+};
+
+const finishGame = (roomId: string): boolean => {
+  if (!roomId || !rooms[roomId]) return false;
+
+  delete rooms[roomId].round;
+  rooms[roomId].isInGame = false;
+
+  // flip all player states to 'unready'
+  for (const user in rooms[roomId].socketGameState) {
+    rooms[roomId].socketGameState[user] = UserGameState.Unready;
+  }
+
+  const message: SocketMessage = {
+    type: SocketMessageType.Action,
+    params: {
+      message: 'Game finished!',
+    },
+    ts: new Date(),
+  };
+  broadcastToRoom(roomId, message);
+
+  return true;
 };
 
 const getRandomProblemForRoom = (roomId: string): Problem | undefined => {
@@ -287,22 +396,53 @@ const getRandomProblemForRoom = (roomId: string): Problem | undefined => {
   return problem;
 };
 
-const playerUnready = (ws: WebSocket): void => {
+const playerForfeit = (ws: WebSocket): boolean => {
   const { userId } = ws;
   const roomId = userToRoom[userId];
 
-  if (!roomId || !rooms[roomId] || !rooms[roomId].socketGameState[userId])
-    return;
+  // only broadcast this action if user in game and user is still playing
+  if (
+    !roomId ||
+    !rooms[roomId] ||
+    !rooms[roomId].isInGame ||
+    !rooms[roomId].round ||
+    rooms[roomId].socketGameState[userId] !== UserGameState.Playing
+  )
+    return false;
 
-  rooms[roomId].socketGameState[userId] = UserGameState.Unready;
+  rooms[roomId].socketGameState[userId] = UserGameState.Forfeited;
+  rooms[roomId].round?.forfeited.push(ws);
+
+  const message: SocketMessage = {
+    type: SocketMessageType.Action,
+    params: {
+      message: `🏳️ ${userId} forfeited! 🏳️`,
+    },
+    ts: new Date(),
+  };
+  broadcastToRoom(roomId, message);
+
+  return true;
 };
 
-const playerReady = (ws: WebSocket): void => {
+const playerUnready = (ws: WebSocket): boolean => {
   const { userId } = ws;
   const roomId = userToRoom[userId];
 
   if (!roomId || !rooms[roomId] || !rooms[roomId].socketGameState[userId])
-    return;
+    return false;
+
+  rooms[roomId].socketGameState[userId] = UserGameState.Unready;
+
+  return true;
+};
+
+const playerReady = (ws: WebSocket): boolean => {
+  const { userId } = ws;
+  const roomId = userToRoom[userId];
+
+  if (!roomId || !rooms[roomId] || !rooms[roomId].socketGameState[userId])
+    return false;
 
   rooms[roomId].socketGameState[userId] = UserGameState.Ready;
 
@@ -315,6 +455,8 @@ const playerReady = (ws: WebSocket): void => {
   if (everyUserIsReady) {
     startGame(roomId);
   }
+
+  return true;
 };
 
 // handles websocket connections/messages
@@ -370,6 +512,10 @@ wss.on('connection', (ws: WebSocket) => {
 
       case SocketMessageType.Unready:
         playerUnready(ws);
+        break;
+
+      case SocketMessageType.Forfeit:
+        playerForfeit(ws);
         break;
 
       default:
