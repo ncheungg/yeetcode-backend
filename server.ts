@@ -12,8 +12,8 @@ import {
   Round,
   Problem,
 } from './types';
-import { MAX_PROBLEM_SIZE, MAX_ROOM_SIZE, PORT } from './consts';
-import { getRandomProblem } from './problems';
+import { MAX_PROBLEM_SIZE, MAX_ROOM_SIZE, PORT, PROBLEM_TIME } from './consts';
+import { getRandomProblem } from './utils';
 
 const wss = new WebSocketServer({ port: PORT });
 const rooms: Rooms = {};
@@ -60,7 +60,6 @@ const createRoom = (ws: WebSocket): void => {
       [userId]: ws,
     },
     completedProblems: new Set(),
-    // completedProblems: [],
     socketGameState: {
       [userId]: UserGameState.Spectating,
     },
@@ -182,9 +181,15 @@ const broadcastFailed = (ws: WebSocket): void => {
   broadcastAction(roomId, message);
 };
 
-const broadcastFinished = (ws: WebSocket): void => {
+const playerFinished = (ws: WebSocket): void => {
   const { userId } = ws;
   const roomId = userToRoom[userId];
+
+  if (!roomId || !rooms[roomId] || !rooms[roomId].socketGameState[userId])
+    return;
+
+  rooms[roomId].round?.finishedOrder.push(ws);
+  rooms[roomId].socketGameState[userId] = UserGameState.Finished;
 
   const message: SocketMessage = {
     type: SocketMessageType.Action,
@@ -238,6 +243,50 @@ const broadcastSubmit = (ws: WebSocket): void => {
   broadcastAction(roomId, message);
 };
 
+const startGame = (roomId: string): void => {
+  const problem = getRandomProblemForRoom(roomId);
+  if (!problem) return;
+
+  const round: Round = {
+    problem: problem,
+    expiryDate: new Date(new Date().getTime() + PROBLEM_TIME * 60000),
+    finishedOrder: [],
+  };
+
+  rooms[roomId].isInGame = true;
+  rooms[roomId].round = round;
+  rooms[roomId].completedProblems.add(problem);
+
+  // flip all player states to 'playing'
+  for (const user in rooms[roomId].socketGameState) {
+    rooms[roomId].socketGameState[user] = UserGameState.Playing;
+  }
+
+  const message: SocketMessage = {
+    type: SocketMessageType.Action,
+    params: {
+      message: '🏁 Game started! 🏁',
+    },
+    ts: new Date(),
+  };
+  broadcastAction(roomId, message);
+};
+
+const getRandomProblemForRoom = (roomId: string): Problem | undefined => {
+  const room = rooms[roomId];
+
+  if (!room || room.completedProblems.size >= MAX_PROBLEM_SIZE)
+    return undefined;
+
+  let problem: Problem | undefined;
+
+  while (!problem || room.completedProblems.has(problem)) {
+    problem = getRandomProblem();
+  }
+
+  return problem;
+};
+
 const playerUnready = (ws: WebSocket): void => {
   const { userId } = ws;
   const roomId = userToRoom[userId];
@@ -257,19 +306,15 @@ const playerReady = (ws: WebSocket): void => {
 
   rooms[roomId].socketGameState[userId] = UserGameState.Ready;
 
-  // condition to start the game when the final player is readys
-};
+  // start game if every user is ready
+  const userStatesArray = Object.values(rooms[roomId].socketGameState);
+  const everyUserIsReady = userStatesArray.every(
+    (user) => user === UserGameState.Ready
+  );
 
-const getRandomProblemForRoom = (room: Room): Problem | undefined => {
-  if (room.completedProblems.size >= MAX_PROBLEM_SIZE) return undefined;
-
-  let problem: Problem | undefined;
-
-  while (!problem || room.completedProblems.has(problem)) {
-    problem = getRandomProblem();
+  if (everyUserIsReady) {
+    startGame(roomId);
   }
-
-  return problem;
 };
 
 // handles websocket connections/messages
@@ -299,7 +344,7 @@ wss.on('connection', (ws: WebSocket) => {
         break;
 
       case SocketMessageType.Finished:
-        broadcastFinished(ws);
+        playerFinished(ws);
         break;
 
       case SocketMessageType.Hint:

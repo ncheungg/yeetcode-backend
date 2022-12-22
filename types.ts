@@ -50,6 +50,8 @@ export interface Problem {
   id: number;
   difficulty: ProblemDifficulty;
   name: string;
+  premium: boolean;
+  topics: string[];
 }
 
 export interface Round {
@@ -63,7 +65,6 @@ export interface Room {
   sockets: {
     [userId: string]: WebSocket;
   };
-  // completedProblems: Problem[];
   completedProblems: Set<Problem>;
   socketGameState: {
     [userId: string]: UserGameState;
