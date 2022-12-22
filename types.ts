@@ -5,27 +5,27 @@ export interface WebSocket extends WebSocketOld {
 }
 
 export enum SocketMessageType {
-  Create = 'create',
-  Join = 'join',
-  Leave = 'leave',
-  Message = 'message',
-  Hint = 'hint',
-  Discussion = 'discussion',
-  Solutions = 'solutions',
-  Submit = 'submit',
-  Finished = 'finished',
-  Failed = 'failed',
-  Action = 'action',
-  Ready = 'ready',
-  Unready = 'unready',
+  Create,
+  Join,
+  Leave,
+  Message,
+  Hint,
+  Discussion,
+  Solutions,
+  Submit,
+  Finished,
+  Failed,
+  Action,
+  Ready,
+  Unready,
 }
 
 export enum UserGameState {
-  Ready = 'ready',
-  Unready = 'unready',
-  Playing = 'playing',
-  Spectating = 'spectating',
-  Finished = 'finished',
+  Ready,
+  Unready,
+  Playing,
+  Spectating,
+  Finished,
 }
 
 export interface SocketMessageParams {
@@ -40,9 +40,9 @@ export interface SocketMessage {
 }
 
 export enum ProblemDifficulty {
-  Easy = 0,
-  Medium = 1,
-  Hard = 2,
+  Easy,
+  Medium,
+  Hard,
 }
 
 export interface Problem {
