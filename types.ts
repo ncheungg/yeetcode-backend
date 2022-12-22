@@ -1,8 +1,7 @@
 import { WebSocket as WebSocketOld } from 'ws';
 
 export interface WebSocket extends WebSocketOld {
-  roomID?: string;
-  userID?: string;
+  userId: string;
 }
 
 export enum SocketMessageType {
@@ -10,17 +9,34 @@ export enum SocketMessageType {
   Join = 'join',
   Leave = 'leave',
   Message = 'message',
+  Hint = 'hint',
+  Discussion = 'discussion',
+  Solutions = 'solutions',
+  Submit = 'submit',
+  Finished = 'finished',
+  Failed = 'failed',
   Action = 'action',
+  Ready = 'ready',
+  Unready = 'unready',
+}
+
+export enum UserGameState {
+  Ready = 'ready',
+  Unready = 'unready',
+  Playing = 'playing',
+  Spectating = 'spectating',
+  Finished = 'finished',
 }
 
 export interface SocketMessageParams {
-  roomID?: string;
+  roomId?: string;
   message?: string;
 }
 
 export interface SocketMessage {
   type: SocketMessageType;
   params: SocketMessageParams;
+  ts: Date;
 }
 
 export enum ProblemDifficulty {
@@ -39,15 +55,26 @@ export interface Problem {
 export interface Round {
   problem: Problem;
   expiryDate: Date;
+  finishedOrder: WebSocket[];
 }
 
 export interface Room {
   id: string;
-  sockets: WebSocket[];
+  sockets: {
+    [userId: string]: WebSocket;
+  };
   completedProblems: Problem[];
-  // userGameState
+  socketGameState: {
+    [userId: string]: UserGameState;
+  };
+  isInGame: boolean;
+  round?: Round;
 }
 
 export interface Rooms {
   [id: string]: Room;
+}
+
+export interface UserToRoom {
+  [id: string]: string | undefined;
 }

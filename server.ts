@@ -6,22 +6,23 @@ import {
   SocketMessageParams,
   Rooms,
   WebSocket,
+  Room,
+  UserGameState,
+  UserToRoom,
 } from './types';
 import { MAX_ROOM_SIZE, PORT } from './consts';
 
 const wss = new WebSocketServer({ port: PORT });
 const rooms: Rooms = {};
+const userToRoom: UserToRoom = {};
 
-const broadcastMessage = (
-  ws: WebSocket,
-  message: SocketMessage
-): boolean => {
-  const { roomID } = ws;
+const broadcastMessage = (ws: WebSocket, message: SocketMessage): boolean => {
+  const roomId = userToRoom[ws.userId];
 
-  if (!roomID || rooms[roomID] === undefined) return false;
+  if (!roomId || !rooms[roomId]) return false;
 
-  for (const wsClient of rooms[roomID].sockets) {
-    if (wsClient === ws) continue;
+  for (const wsClient of Object.values(rooms[roomId].sockets)) {
+    if (wsClient.userId === ws.userId) continue;
     wsClient.send(message);
   }
 
@@ -29,96 +30,230 @@ const broadcastMessage = (
 };
 
 const broadcastAction = (
-  ws: WebSocket,
+  roomId: string | undefined,
   message: SocketMessage
 ): boolean => {
-  const { roomID } = ws;
+  if (!roomId || !rooms[roomId]) return false;
 
-  if (!roomID || rooms[roomID] === undefined) return false;
-
-  for (const wsClient of rooms[roomID]) {
+  for (const wsClient of Object.values(rooms[roomId].sockets)) {
     wsClient.send(message);
   }
 
   return true;
 };
 
-const createRoom = (ws: WebSocket): string => {
-  let roomID;
+// creates a room, broadcasts action message, returns roomId to socket
+const createRoom = (ws: WebSocket): void => {
+  const { userId } = ws;
+  let roomId;
 
-  while (!roomID || rooms[roomID] !== undefined) {
-    roomID = uuidv4();
+  while (!roomId || rooms[roomId] !== undefined) {
+    roomId = uuidv4();
   }
 
-  ws.roomID = roomID;
-  rooms[roomID] = [ws];
+  const room: Room = {
+    id: roomId,
+    sockets: {
+      [userId]: ws,
+    },
+    completedProblems: [],
+    socketGameState: {
+      [userId]: UserGameState.Spectating,
+    },
+    isInGame: false,
+  };
+  rooms[roomId] = room;
+  userToRoom[userId] = roomId;
 
-  const { userID } = ws;
-  const message: SocketMessage = {
+  const actionMessage: SocketMessage = {
     type: SocketMessageType.Action,
     params: {
-      message: `${userID} created a room!`,
+      message: `${userId} created a room!`,
     },
+    ts: new Date(),
   };
+  broadcastAction(roomId, actionMessage);
 
-  broadcastAction(ws, message);
-
-  return roomID;
+  const createRoomMessage: SocketMessage = {
+    type: SocketMessageType.Create,
+    params: {
+      roomId,
+    },
+    ts: new Date(),
+  };
+  ws.send(createRoomMessage);
 };
 
 const joinRoom = (ws: WebSocket, params: SocketMessageParams): boolean => {
-  const { roomID } = params;
+  const { roomId } = params;
+  const { userId } = ws;
 
   if (
-    !roomID ||
-    rooms[roomID] === undefined ||
-    rooms[roomID].length >= MAX_ROOM_SIZE
+    !roomId ||
+    !rooms[roomId] ||
+    Object.keys(rooms[roomId].sockets).length >= MAX_ROOM_SIZE
   )
     return false;
 
-  ws.roomID = roomID;
-  rooms[roomID].push(ws);
+  userToRoom[userId] = roomId;
+  rooms[roomId].sockets[userId] = ws;
 
-  const { userID } = ws;
-  const message: SocketMessage = {
+  // Unready if game hasn't started yet, spectating if game has started
+  rooms[roomId].socketGameState[userId] = rooms[roomId].isInGame
+    ? UserGameState.Spectating
+    : UserGameState.Unready;
+
+  const actionMessage: SocketMessage = {
     type: SocketMessageType.Action,
     params: {
-      message: `${userID} joined the room!`,
+      message: `${userId} joined the room!`,
     },
+    ts: new Date(),
   };
-
-  broadcastAction(ws, message);
+  broadcastAction(roomId, actionMessage);
 
   return true;
 };
 
 const leaveRoom = (ws: WebSocket): boolean => {
-  const roomID: string | undefined = ws.roomID;
+  const { userId } = ws;
+  const roomId: string | undefined = userToRoom[userId];
 
   if (
-    !roomID ||
-    rooms[roomID] === undefined ||
-    rooms[roomID].indexOf(ws) === -1
+    !roomId ||
+    !rooms[roomId] ||
+    !rooms[roomId].sockets[userId] ||
+    !rooms[roomId].socketGameState[userId]
   )
     return false;
 
-  rooms[roomID].filter((item) => item !== ws);
-  if (rooms[roomID].length === 0) {
-    delete rooms[roomID];
+  delete rooms[roomId].sockets[userId];
+  delete rooms[roomId].socketGameState[userId];
+
+  if (
+    Object.keys(rooms[roomId].sockets).length === 0 ||
+    Object.keys(rooms[roomId].socketGameState).length === 0
+  ) {
+    delete rooms[roomId];
     return true;
   }
 
-  const { userID } = ws;
   const message: SocketMessage = {
     type: SocketMessageType.Action,
     params: {
-      message: `${userID} left the room!`,
+      message: `${userId} left the room!`,
     },
+    ts: new Date(),
   };
-
-  broadcastAction(ws, message);
+  broadcastAction(roomId, message);
 
   return true;
+};
+
+const broadcastDiscussion = (ws: WebSocket): void => {
+  const { userId } = ws;
+  const roomId = userToRoom[userId];
+
+  const message: SocketMessage = {
+    type: SocketMessageType.Action,
+    params: {
+      message: `⚠️ ${userId} viewed the Discussions tab! ⚠️`,
+    },
+    ts: new Date(),
+  };
+  broadcastAction(roomId, message);
+};
+
+const broadcastFailed = (ws: WebSocket): void => {
+  const { userId } = ws;
+  const roomId = userToRoom[userId];
+
+  const message: SocketMessage = {
+    type: SocketMessageType.Action,
+    params: {
+      message: `🛑 ${userId}'s submission failed! 🛑`,
+    },
+    ts: new Date(),
+  };
+  broadcastAction(roomId, message);
+};
+
+const broadcastFinished = (ws: WebSocket): void => {
+  const { userId } = ws;
+  const roomId = userToRoom[userId];
+
+  const message: SocketMessage = {
+    type: SocketMessageType.Action,
+    params: {
+      message: `✅ ${userId} finished! ✅`,
+    },
+    ts: new Date(),
+  };
+  broadcastAction(roomId, message);
+};
+
+const broadcastHint = (ws: WebSocket): void => {
+  const { userId } = ws;
+  const roomId = userToRoom[userId];
+
+  const message: SocketMessage = {
+    type: SocketMessageType.Action,
+    params: {
+      message: `⚠️ ${userId} viewed a hint! ⚠️`,
+    },
+    ts: new Date(),
+  };
+  broadcastAction(roomId, message);
+};
+
+const broadcastSolutions = (ws: WebSocket): void => {
+  const { userId } = ws;
+  const roomId = userToRoom[userId];
+
+  const message: SocketMessage = {
+    type: SocketMessageType.Action,
+    params: {
+      message: `⚠️ ${userId} viewed the Solutions tab! ⚠️`,
+    },
+    ts: new Date(),
+  };
+  broadcastAction(roomId, message);
+};
+
+const broadcastSubmit = (ws: WebSocket): void => {
+  const { userId } = ws;
+  const roomId = userToRoom[userId];
+
+  const message: SocketMessage = {
+    type: SocketMessageType.Action,
+    params: {
+      message: `${userId} submitted!`,
+    },
+    ts: new Date(),
+  };
+  broadcastAction(roomId, message);
+};
+
+const playerUnready = (ws: WebSocket): void => {
+  const { userId } = ws;
+  const roomId = userToRoom[userId];
+
+  if (!roomId || !rooms[roomId] || !rooms[roomId].socketGameState[userId])
+    return;
+
+  rooms[roomId].socketGameState[userId] = UserGameState.Unready;
+};
+
+const playerReady = (ws: WebSocket): void => {
+  const { userId } = ws;
+  const roomId = userToRoom[userId];
+
+  if (!roomId || !rooms[roomId] || !rooms[roomId].socketGameState[userId])
+    return;
+
+  rooms[roomId].socketGameState[userId] = UserGameState.Ready;
+
+  // condition to start the game when the final player is readys
 };
 
 // handles websocket connections/messages
@@ -128,25 +263,61 @@ wss.on('connection', (ws: WebSocket) => {
 
   // action handler
   ws.on('message', (data: string) => {
-    const { type, params } = JSON.parse(data) as SocketMessage;
+    const { type, params, ts } = JSON.parse(data) as SocketMessage;
 
     switch (type) {
       case SocketMessageType.Create:
         createRoom(ws);
         break;
+
       case SocketMessageType.Join:
         joinRoom(ws, params);
         break;
-      case SocketMessageType.Leave:
-        leaveRoom(ws);
+
+      case SocketMessageType.Discussion:
+        broadcastDiscussion(ws);
         break;
+
+      case SocketMessageType.Failed:
+        broadcastFailed(ws);
+        break;
+
+      case SocketMessageType.Finished:
+        broadcastFinished(ws);
+        break;
+
+      case SocketMessageType.Hint:
+        broadcastHint(ws);
+        break;
+
       case SocketMessageType.Message:
-        broadcastMessage(ws, { type, params });
+        const message: SocketMessage = { type, params, ts };
+        broadcastMessage(ws, message);
         break;
-      case SocketMessageType.Action:
-        broadcastAction(ws, { type, params });
+
+      case SocketMessageType.Solutions:
+        broadcastSolutions(ws);
         break;
+
+      case SocketMessageType.Submit:
+        broadcastSubmit(ws);
+        break;
+
+      case SocketMessageType.Ready:
+        playerReady(ws);
+        break;
+
+      case SocketMessageType.Unready:
+        playerUnready(ws);
+        break;
+
+      default:
+        console.error(`Error: could not process action of type ${type}`);
     }
+  });
+
+  ws.on('close', () => {
+    leaveRoom(ws);
   });
 });
 
