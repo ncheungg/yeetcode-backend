@@ -9,8 +9,11 @@ import {
   Room,
   UserGameState,
   UserToRoom,
+  Round,
+  Problem,
 } from './types';
-import { MAX_ROOM_SIZE, PORT } from './consts';
+import { MAX_PROBLEM_SIZE, MAX_ROOM_SIZE, PORT } from './consts';
+import { getRandomProblem } from './problems';
 
 const wss = new WebSocketServer({ port: PORT });
 const rooms: Rooms = {};
@@ -45,7 +48,7 @@ const broadcastAction = (
 // creates a room, broadcasts action message, returns roomId to socket
 const createRoom = (ws: WebSocket): void => {
   const { userId } = ws;
-  let roomId;
+  let roomId: string | undefined;
 
   while (!roomId || rooms[roomId] !== undefined) {
     roomId = uuidv4();
@@ -56,7 +59,8 @@ const createRoom = (ws: WebSocket): void => {
     sockets: {
       [userId]: ws,
     },
-    completedProblems: [],
+    completedProblems: new Set(),
+    // completedProblems: [],
     socketGameState: {
       [userId]: UserGameState.Spectating,
     },
@@ -254,6 +258,18 @@ const playerReady = (ws: WebSocket): void => {
   rooms[roomId].socketGameState[userId] = UserGameState.Ready;
 
   // condition to start the game when the final player is readys
+};
+
+const getRandomProblemForRoom = (room: Room): Problem | undefined => {
+  if (room.completedProblems.size >= MAX_PROBLEM_SIZE) return undefined;
+
+  let problem: Problem | undefined;
+
+  while (!problem || room.completedProblems.has(problem)) {
+    problem = getRandomProblem();
+  }
+
+  return problem;
 };
 
 // handles websocket connections/messages

@@ -63,7 +63,8 @@ export interface Room {
   sockets: {
     [userId: string]: WebSocket;
   };
-  completedProblems: Problem[];
+  // completedProblems: Problem[];
+  completedProblems: Set<Problem>;
   socketGameState: {
     [userId: string]: UserGameState;
   };
