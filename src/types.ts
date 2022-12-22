@@ -2,6 +2,7 @@ import { WebSocket as WebSocketOld } from 'ws';
 
 export interface WebSocket extends WebSocketOld {
   userId: string;
+  isAlive: boolean;
 }
 
 export enum SocketMessageType {
