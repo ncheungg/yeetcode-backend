@@ -18,6 +18,8 @@ export enum SocketMessageType {
   Action,
   Ready,
   Unready,
+  Problem,
+  Forfeit,
 }
 
 export enum UserGameState {
@@ -26,11 +28,13 @@ export enum UserGameState {
   Playing,
   Spectating,
   Finished,
+  Forfeited,
 }
 
 export interface SocketMessageParams {
   roomId?: string;
   message?: string;
+  problem?: Problem;
 }
 
 export interface SocketMessage {
@@ -58,6 +62,7 @@ export interface Round {
   problem: Problem;
   expiryDate: Date;
   finishedOrder: WebSocket[];
+  forfeited: WebSocket[];
 }
 
 export interface Room {
