@@ -23,6 +23,31 @@ export interface SocketMessage {
   params: SocketMessageParams;
 }
 
+export enum ProblemDifficulty {
+  Easy = 0,
+  Medium = 1,
+  Hard = 2,
+}
+
+export interface Problem {
+  url: string;
+  id: number;
+  difficulty: ProblemDifficulty;
+  name: string;
+}
+
+export interface Round {
+  problem: Problem;
+  expiryDate: Date;
+}
+
+export interface Room {
+  id: string;
+  sockets: WebSocket[];
+  completedProblems: Problem[];
+  // userGameState
+}
+
 export interface Rooms {
-  [id: string]: WebSocket[];
+  [id: string]: Room;
 }

@@ -20,7 +20,7 @@ const broadcastMessage = (
 
   if (!roomID || rooms[roomID] === undefined) return false;
 
-  for (const wsClient of rooms[roomID]) {
+  for (const wsClient of rooms[roomID].sockets) {
     if (wsClient === ws) continue;
     wsClient.send(message);
   }
