@@ -33,7 +33,7 @@ const broadcastMessage = (ws: WebSocket, message: Message): boolean => {
 
   for (const wsClient of Object.values(rooms[roomId].sockets)) {
     if (wsClient.userId === ws.userId) continue;
-    wsClient.send(message);
+    wsClient.send(JSON.stringify(message));
   }
 
   return true;
@@ -47,7 +47,7 @@ const broadcastToRoom = (
   if (!roomId || !rooms[roomId]) return false;
 
   for (const wsClient of Object.values(rooms[roomId].sockets)) {
-    wsClient.send(message);
+    wsClient.send(JSON.stringify(message));
   }
 
   return true;
@@ -92,7 +92,7 @@ const createRoom = (ws: WebSocket): void => {
     },
     ts: new Date(),
   };
-  ws.send(createRoomMessage);
+  ws.send(JSON.stringify(createRoomMessage));
 };
 
 const joinRoom = (ws: WebSocket, params?: MessageParams): boolean => {
@@ -515,8 +515,16 @@ wss.on('connection', (ws: WebSocket) => {
   });
 
   // action handler
-  ws.on('message', (data: string) => {
-    const { type, params, ts } = JSON.parse(data) as Message;
+  ws.on('message', (data: string, isBinary) => {
+    // const message = isBinary ? data : data.toString();
+    var message: string;
+    if (isBinary) {
+      message = data;
+    } else {
+      message = data.toString();
+    }
+
+    const { type, params, ts } = JSON.parse(message) as Message;
 
     switch (type) {
       case MessageType.Create:
@@ -549,6 +557,8 @@ wss.on('connection', (ws: WebSocket) => {
 
       case MessageType.Message:
         const message: Message = { type, params, ts };
+        console.log('got message', message);
+
         broadcastMessage(ws, message);
         break;
 
@@ -563,6 +573,7 @@ wss.on('connection', (ws: WebSocket) => {
         break;
 
       case MessageType.Ready:
+        console.log('got ready');
         playerReady(ws);
         break;
 
