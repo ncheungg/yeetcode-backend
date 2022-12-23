@@ -5,7 +5,7 @@ export interface WebSocket extends WebSocketOld {
   isAlive: boolean;
 }
 
-export enum SocketMessageType {
+export enum MessageType {
   Create,
   Join,
   Leave,
@@ -33,15 +33,15 @@ export enum UserGameState {
   Forfeited,
 }
 
-export interface SocketMessageParams {
+export interface MessageParams {
   roomId?: string;
   message?: string;
   problem?: Problem;
 }
 
-export interface SocketMessage {
-  type: SocketMessageType;
-  params?: SocketMessageParams;
+export interface Message {
+  type: MessageType;
+  params?: MessageParams;
   ts: Date;
 }
 

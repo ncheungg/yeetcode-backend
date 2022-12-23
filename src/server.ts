@@ -1,9 +1,9 @@
 import { WebSocketServer } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  SocketMessage,
-  SocketMessageType,
-  SocketMessageParams,
+  Message,
+  MessageType,
+  MessageParams,
   Rooms,
   WebSocket,
   Room,
@@ -26,7 +26,7 @@ const rooms: Rooms = {};
 const userToRoom: UserToRoom = {};
 
 // broadcasts a user message to all sockets except for itself
-const broadcastMessage = (ws: WebSocket, message: SocketMessage): boolean => {
+const broadcastMessage = (ws: WebSocket, message: Message): boolean => {
   const roomId = userToRoom[ws.userId];
 
   if (!roomId || !rooms[roomId]) return false;
@@ -42,7 +42,7 @@ const broadcastMessage = (ws: WebSocket, message: SocketMessage): boolean => {
 // broadcasts to everyone in the room
 const broadcastToRoom = (
   roomId: string | undefined,
-  message: SocketMessage
+  message: Message
 ): boolean => {
   if (!roomId || !rooms[roomId]) return false;
 
@@ -76,8 +76,8 @@ const createRoom = (ws: WebSocket): void => {
   rooms[roomId] = room;
   userToRoom[userId] = roomId;
 
-  const actionMessage: SocketMessage = {
-    type: SocketMessageType.Action,
+  const actionMessage: Message = {
+    type: MessageType.Action,
     params: {
       message: `${userId} created a room!`,
     },
@@ -85,8 +85,8 @@ const createRoom = (ws: WebSocket): void => {
   };
   broadcastToRoom(roomId, actionMessage);
 
-  const createRoomMessage: SocketMessage = {
-    type: SocketMessageType.Create,
+  const createRoomMessage: Message = {
+    type: MessageType.Create,
     params: {
       roomId,
     },
@@ -95,7 +95,7 @@ const createRoom = (ws: WebSocket): void => {
   ws.send(createRoomMessage);
 };
 
-const joinRoom = (ws: WebSocket, params?: SocketMessageParams): boolean => {
+const joinRoom = (ws: WebSocket, params?: MessageParams): boolean => {
   if (!params) return false;
 
   const { roomId } = params;
@@ -116,8 +116,8 @@ const joinRoom = (ws: WebSocket, params?: SocketMessageParams): boolean => {
     ? UserGameState.Spectating
     : UserGameState.Unready;
 
-  const actionMessage: SocketMessage = {
-    type: SocketMessageType.Action,
+  const actionMessage: Message = {
+    type: MessageType.Action,
     params: {
       message: `${userId} joined the room!`,
     },
@@ -151,8 +151,8 @@ const leaveRoom = (ws: WebSocket): boolean => {
     return true;
   }
 
-  const message: SocketMessage = {
-    type: SocketMessageType.Action,
+  const message: Message = {
+    type: MessageType.Action,
     params: {
       message: `${userId} left the room!`,
     },
@@ -177,8 +177,8 @@ const broadcastDiscussion = (ws: WebSocket): boolean => {
   )
     return false;
 
-  const message: SocketMessage = {
-    type: SocketMessageType.Action,
+  const message: Message = {
+    type: MessageType.Action,
     params: {
       message: `⚠️ ${userId} viewed the Discussions tab! ⚠️`,
     },
@@ -203,8 +203,8 @@ const broadcastFailed = (ws: WebSocket): boolean => {
   )
     return false;
 
-  const message: SocketMessage = {
-    type: SocketMessageType.Action,
+  const message: Message = {
+    type: MessageType.Action,
     params: {
       message: `🛑 ${userId}'s submission failed! 🛑`,
     },
@@ -232,8 +232,8 @@ const playerFinished = (ws: WebSocket): boolean => {
   rooms[roomId].round?.finishedOrder.push(ws);
   rooms[roomId].socketGameState[userId] = UserGameState.Finished;
 
-  const message: SocketMessage = {
-    type: SocketMessageType.Action,
+  const message: Message = {
+    type: MessageType.Action,
     params: {
       message: `✅ ${userId} finished! ✅`,
     },
@@ -266,8 +266,8 @@ const broadcastHint = (ws: WebSocket): boolean => {
   )
     return false;
 
-  const message: SocketMessage = {
-    type: SocketMessageType.Action,
+  const message: Message = {
+    type: MessageType.Action,
     params: {
       message: `⚠️ ${userId} viewed a hint! ⚠️`,
     },
@@ -292,8 +292,8 @@ const broadcastSolutions = (ws: WebSocket): boolean => {
   )
     return false;
 
-  const message: SocketMessage = {
-    type: SocketMessageType.Action,
+  const message: Message = {
+    type: MessageType.Action,
     params: {
       message: `⚠️ ${userId} viewed the Solutions tab! ⚠️`,
     },
@@ -318,8 +318,8 @@ const playerSubmit = (ws: WebSocket): boolean => {
   )
     return false;
 
-  const message: SocketMessage = {
-    type: SocketMessageType.Action,
+  const message: Message = {
+    type: MessageType.Action,
     params: {
       message: `${userId} submitted!`,
     },
@@ -363,8 +363,8 @@ const startGame = (roomId: string): boolean => {
   }
 
   // sends the problem and its details to all users
-  const problemMessage: SocketMessage = {
-    type: SocketMessageType.StartGame,
+  const problemMessage: Message = {
+    type: MessageType.StartGame,
     params: {
       problem: problem,
     },
@@ -372,8 +372,8 @@ const startGame = (roomId: string): boolean => {
   };
   broadcastToRoom(roomId, problemMessage);
 
-  const actionMessage: SocketMessage = {
-    type: SocketMessageType.Action,
+  const actionMessage: Message = {
+    type: MessageType.Action,
     params: {
       message: 'Game started!',
     },
@@ -400,14 +400,14 @@ const endGame = (roomId: string): boolean => {
   }
 
   // sends a message to all sockets to end the game
-  const endMessage: SocketMessage = {
-    type: SocketMessageType.EndGame,
+  const endMessage: Message = {
+    type: MessageType.EndGame,
     ts: new Date(),
   };
   broadcastToRoom(roomId, endMessage);
 
-  const actionMessage: SocketMessage = {
-    type: SocketMessageType.Action,
+  const actionMessage: Message = {
+    type: MessageType.Action,
     params: {
       message: 'Game finished!',
     },
@@ -450,8 +450,8 @@ const playerForfeit = (ws: WebSocket): boolean => {
   rooms[roomId].socketGameState[userId] = UserGameState.Forfeited;
   rooms[roomId].round?.forfeited.push(ws);
 
-  const message: SocketMessage = {
-    type: SocketMessageType.Action,
+  const message: Message = {
+    type: MessageType.Action,
     params: {
       message: `🏳️ ${userId} forfeited! 🏳️`,
     },
@@ -517,55 +517,55 @@ wss.on('connection', (ws: WebSocket) => {
 
   // action handler
   ws.on('message', (data: string) => {
-    const { type, params, ts } = JSON.parse(data) as SocketMessage;
+    const { type, params, ts } = JSON.parse(data) as Message;
 
     switch (type) {
-      case SocketMessageType.Create:
+      case MessageType.Create:
         createRoom(ws);
         break;
 
-      case SocketMessageType.Join:
+      case MessageType.Join:
         joinRoom(ws, params);
         break;
 
-      case SocketMessageType.Discussion:
+      case MessageType.Discussion:
         broadcastDiscussion(ws);
         break;
 
-      case SocketMessageType.Failed:
+      case MessageType.Failed:
         broadcastFailed(ws);
         break;
 
-      case SocketMessageType.Finished:
+      case MessageType.Finished:
         playerFinished(ws);
         break;
 
-      case SocketMessageType.Hint:
+      case MessageType.Hint:
         broadcastHint(ws);
         break;
 
-      case SocketMessageType.Message:
-        const message: SocketMessage = { type, params, ts };
+      case MessageType.Message:
+        const message: Message = { type, params, ts };
         broadcastMessage(ws, message);
         break;
 
-      case SocketMessageType.Solutions:
+      case MessageType.Solutions:
         broadcastSolutions(ws);
         break;
 
-      case SocketMessageType.Submit:
+      case MessageType.Submit:
         playerSubmit(ws);
         break;
 
-      case SocketMessageType.Ready:
+      case MessageType.Ready:
         playerReady(ws);
         break;
 
-      case SocketMessageType.Unready:
+      case MessageType.Unready:
         playerUnready(ws);
         break;
 
-      case SocketMessageType.Forfeit:
+      case MessageType.Forfeit:
         playerForfeit(ws);
         break;
 
