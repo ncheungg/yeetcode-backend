@@ -12,7 +12,13 @@ import {
   Round,
   Problem,
 } from './types';
-import { MAX_PROBLEM_SIZE, MAX_ROOM_SIZE, PORT, PROBLEM_TIME } from './consts';
+import {
+  MAX_PROBLEM_SIZE,
+  MAX_ROOM_SIZE,
+  PORT,
+  PROBLEM_TIME,
+  SOCKET_TIMEOUT,
+} from './consts';
 import { getRandomProblem } from './utils';
 
 const wss = new WebSocketServer({ port: PORT });
@@ -503,6 +509,12 @@ wss.on('connection', (ws: WebSocket) => {
   console.log('connected with a socket!');
   console.log(ws);
 
+  // ping-pong handler
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
+
   // action handler
   ws.on('message', (data: string) => {
     const { type, params, ts } = JSON.parse(data) as SocketMessage;
@@ -565,6 +577,24 @@ wss.on('connection', (ws: WebSocket) => {
   ws.on('close', () => {
     leaveRoom(ws);
   });
+});
+
+// ping-pong interval checker
+// https://www.npmjs.com/package/ws#how-to-detect-and-close-broken-connections
+const interval = setInterval(() => {
+  for (const ws of wss.clients as Set<WebSocket>) {
+    if (ws.isAlive === false) {
+      leaveRoom(ws);
+      return ws.terminate();
+    }
+
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, SOCKET_TIMEOUT);
+
+wss.on('close', () => {
+  clearInterval(interval);
 });
 
 console.log(`Listening on port ${PORT}...`);
