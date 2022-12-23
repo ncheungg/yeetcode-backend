@@ -507,7 +507,6 @@ const playerReady = (ws: WebSocket): boolean => {
 // handles websocket connections/messages
 wss.on('connection', (ws: WebSocket) => {
   console.log('connected with a socket!');
-  console.log(ws);
 
   // ping-pong handler
   ws.isAlive = true;
@@ -529,18 +528,22 @@ wss.on('connection', (ws: WebSocket) => {
         break;
 
       case MessageType.Discussion:
+        console.log('got discussion');
         broadcastDiscussion(ws);
         break;
 
       case MessageType.Failed:
+        console.log('got failed');
         broadcastFailed(ws);
         break;
 
       case MessageType.Finished:
+        console.log('got finished');
         playerFinished(ws);
         break;
 
       case MessageType.Hint:
+        console.log('got hint');
         broadcastHint(ws);
         break;
 
@@ -550,10 +553,12 @@ wss.on('connection', (ws: WebSocket) => {
         break;
 
       case MessageType.Solutions:
+        console.log('got solutions');
         broadcastSolutions(ws);
         break;
 
       case MessageType.Submit:
+        console.log('got submit');
         playerSubmit(ws);
         break;
 
