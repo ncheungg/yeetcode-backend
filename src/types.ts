@@ -37,6 +37,7 @@ export interface MessageParams {
   roomId?: string;
   message?: string;
   problem?: Problem;
+  userInfo?: UserInfo;
 }
 
 export interface Message {
@@ -87,4 +88,9 @@ export interface Rooms {
 
 export interface UserToRoom {
   [id: string]: string | undefined;
+}
+
+export interface UserInfo {
+  userId?: string;
+  avatarUrl?: string | null;
 }
