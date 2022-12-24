@@ -25,7 +25,6 @@ import { getRandomProblem } from './utils';
 const wss = new WebSocketServer({ port: PORT });
 const rooms: Rooms = {};
 const userToRoom: UserToRoom = {};
-const wsIdToUsername: WebSocketIDToUserName = {};
 // broadcasts a user message to all sockets except for itself
 const broadcastMessage = (ws: WebSocket, message: Message): boolean => {
   const roomId = userToRoom[ws.userId];
@@ -56,10 +55,10 @@ const broadcastToRoom = (
 
 // creates a room, broadcasts action message, sends roomId back to socket
 const createRoom = (ws: WebSocket, params?: MessageParams): void => {
+  ws.userId = params?.userInfo?.userId as string;
+
   const { userId } = ws;
   let roomId: string | undefined;
-  let userInfo = params?.userInfo;
-  wsIdToUsername[userId] = userInfo?.userId;
 
   while (!roomId || rooms[roomId] !== undefined) {
     roomId = uuidv4();
@@ -82,7 +81,7 @@ const createRoom = (ws: WebSocket, params?: MessageParams): void => {
   const actionMessage: Message = {
     type: MessageType.Action,
     params: {
-      message: `${wsIdToUsername[userId]} created a room (${roomId})!`,
+      message: `${userId} created a room (${roomId})!`,
     },
     ts: new Date(),
   };
@@ -100,12 +99,10 @@ const createRoom = (ws: WebSocket, params?: MessageParams): void => {
 
 const joinRoom = (ws: WebSocket, params?: MessageParams): boolean => {
   if (!params) return false;
+  const { roomId, userInfo } = params;
+  ws.userId = userInfo?.userId as string;
 
-  const { roomId } = params;
   const { userId } = ws;
-  let userInfo = params?.userInfo;
-
-  wsIdToUsername[userId] = userInfo?.userId;
 
   if (
     !roomId ||
@@ -125,7 +122,7 @@ const joinRoom = (ws: WebSocket, params?: MessageParams): boolean => {
   const actionMessage: Message = {
     type: MessageType.Action,
     params: {
-      message: `${wsIdToUsername[userId]} joined the room!`,
+      message: `${userId} joined the room!`,
     },
     ts: new Date(),
   };
@@ -160,13 +157,11 @@ const leaveRoom = (ws: WebSocket): boolean => {
   const message: Message = {
     type: MessageType.Action,
     params: {
-      message: `${wsIdToUsername[userId]} left the room!`,
+      message: `${userId} left the room!`,
     },
     ts: new Date(),
   };
   broadcastToRoom(roomId, message);
-
-  delete wsIdToUsername[userId];
 
   return true;
 };
@@ -188,7 +183,7 @@ const broadcastDiscussion = (ws: WebSocket): boolean => {
   const message: Message = {
     type: MessageType.Action,
     params: {
-      message: `⚠️ ${wsIdToUsername[userId]} viewed the Discussions tab! ⚠️`,
+      message: `⚠️ ${userId} viewed the Discussions tab! ⚠️`,
     },
     ts: new Date(),
   };
@@ -214,7 +209,7 @@ const broadcastFailed = (ws: WebSocket): boolean => {
   const message: Message = {
     type: MessageType.Action,
     params: {
-      message: `🛑 ${wsIdToUsername[userId]}'s submission failed! 🛑`,
+      message: `🛑 ${userId}'s submission failed! 🛑`,
     },
     ts: new Date(),
   };
@@ -243,7 +238,7 @@ const playerFinished = (ws: WebSocket): boolean => {
   const message: Message = {
     type: MessageType.Action,
     params: {
-      message: `✅ ${wsIdToUsername[userId]} finished! ✅`,
+      message: `✅ ${userId} finished! ✅`,
     },
     ts: new Date(),
   };
@@ -277,7 +272,7 @@ const broadcastHint = (ws: WebSocket): boolean => {
   const message: Message = {
     type: MessageType.Action,
     params: {
-      message: `⚠️ ${wsIdToUsername[userId]} viewed a hint! ⚠️`,
+      message: `⚠️ ${userId} viewed a hint! ⚠️`,
     },
     ts: new Date(),
   };
@@ -303,7 +298,7 @@ const broadcastSolutions = (ws: WebSocket): boolean => {
   const message: Message = {
     type: MessageType.Action,
     params: {
-      message: `⚠️ ${wsIdToUsername[userId]} viewed the Solutions tab! ⚠️`,
+      message: `⚠️ ${userId} viewed the Solutions tab! ⚠️`,
     },
     ts: new Date(),
   };
@@ -329,7 +324,7 @@ const playerSubmit = (ws: WebSocket): boolean => {
   const message: Message = {
     type: MessageType.Action,
     params: {
-      message: `${wsIdToUsername[userId]} submitted!`,
+      message: `${userId} submitted!`,
     },
     ts: new Date(),
   };
@@ -461,7 +456,7 @@ const playerForfeit = (ws: WebSocket): boolean => {
   const message: Message = {
     type: MessageType.Action,
     params: {
-      message: `🏳️ ${wsIdToUsername[userId]} forfeited! 🏳️`,
+      message: `🏳️ ${userId} forfeited! 🏳️`,
     },
     ts: new Date(),
   };
