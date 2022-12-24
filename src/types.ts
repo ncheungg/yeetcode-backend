@@ -90,10 +90,6 @@ export interface UserToRoom {
   [id: string]: string | undefined;
 }
 
-export interface WebSocketIDToUserName {
-  [wsId: string]: string | undefined;
-}
-
 export interface UserInfo {
   userId?: string;
   avatarUrl?: string | null;

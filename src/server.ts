@@ -11,7 +11,6 @@ import {
   UserToRoom,
   Round,
   Problem,
-  WebSocketIDToUserName,
 } from './types';
 import {
   MAX_PROBLEM_SIZE,
