@@ -16,10 +16,12 @@ import { getRandomProblem } from './utils';
 
 const rooms: Rooms = {};
 const userToRoom: UserToRoom = {};
+
 // broadcasts a user message to all sockets except for itself
 const broadcastMessage = (ws: WebSocket, message: Message): boolean => {
-  const roomId = userToRoom[ws.userId];
+  if (!ws.userId) return false;
 
+  const roomId = userToRoom[ws.userId];
   if (!roomId || !rooms[roomId]) return false;
 
   for (const wsClient of Object.values(rooms[roomId].sockets)) {
@@ -45,10 +47,12 @@ const broadcastToRoom = (
 };
 
 // creates a room, broadcasts action message, sends roomId back to socket
-const createRoom = (ws: WebSocket, params?: MessageParams): void => {
-  ws.userId = params?.userInfo?.userId as string;
+const createRoom = (ws: WebSocket, params?: MessageParams): boolean => {
+  if (!params?.userInfo?.userId) return false;
 
-  const { userId } = ws;
+  const { userId } = params.userInfo;
+  ws.userId = userId;
+
   let roomId: string | undefined;
 
   while (!roomId || rooms[roomId] !== undefined) {
@@ -86,14 +90,18 @@ const createRoom = (ws: WebSocket, params?: MessageParams): void => {
     ts: new Date(),
   };
   ws.send(JSON.stringify(createRoomMessage));
+
+  return true;
 };
 
 const joinRoom = (ws: WebSocket, params?: MessageParams): boolean => {
   if (!params) return false;
-  const { roomId, userInfo } = params;
-  ws.userId = userInfo?.userId as string;
 
-  const { userId } = ws;
+  const { roomId, userInfo } = params;
+  if (!userInfo?.userId) return false;
+
+  const { userId } = userInfo;
+  ws.userId = userId;
 
   if (
     !roomId ||
@@ -124,6 +132,8 @@ const joinRoom = (ws: WebSocket, params?: MessageParams): boolean => {
 
 export const leaveRoom = (ws: WebSocket): boolean => {
   const { userId } = ws;
+  if (!userId) return false;
+
   const roomId: string | undefined = userToRoom[userId];
 
   if (
@@ -159,6 +169,8 @@ export const leaveRoom = (ws: WebSocket): boolean => {
 
 const broadcastDiscussion = (ws: WebSocket): boolean => {
   const { userId } = ws;
+  if (!userId) return false;
+
   const roomId = userToRoom[userId];
 
   // only broadcast this action if user in game and user is still playing
@@ -185,6 +197,8 @@ const broadcastDiscussion = (ws: WebSocket): boolean => {
 
 const broadcastFailed = (ws: WebSocket): boolean => {
   const { userId } = ws;
+  if (!userId) return false;
+
   const roomId = userToRoom[userId];
 
   // only broadcast this action if user in game and user is still playing
@@ -211,6 +225,8 @@ const broadcastFailed = (ws: WebSocket): boolean => {
 
 const playerFinished = (ws: WebSocket): boolean => {
   const { userId } = ws;
+  if (!userId) return false;
+
   const roomId = userToRoom[userId];
 
   // only broadcast this action if user in game and user is still playing
@@ -248,6 +264,8 @@ const playerFinished = (ws: WebSocket): boolean => {
 
 const broadcastHint = (ws: WebSocket): boolean => {
   const { userId } = ws;
+  if (!userId) return false;
+
   const roomId = userToRoom[userId];
 
   // only broadcast this action if user in game and user is still playing
@@ -274,6 +292,8 @@ const broadcastHint = (ws: WebSocket): boolean => {
 
 const broadcastSolutions = (ws: WebSocket): boolean => {
   const { userId } = ws;
+  if (!userId) return false;
+
   const roomId = userToRoom[userId];
 
   // only broadcast this action if user in game and user is still playing
@@ -300,6 +320,8 @@ const broadcastSolutions = (ws: WebSocket): boolean => {
 
 const playerSubmit = (ws: WebSocket): boolean => {
   const { userId } = ws;
+  if (!userId) return false;
+
   const roomId = userToRoom[userId];
 
   // only broadcast this action if user in game and user is still playing
@@ -429,6 +451,8 @@ const getRandomProblemForRoom = (roomId: string): Problem | undefined => {
 
 const playerForfeit = (ws: WebSocket): boolean => {
   const { userId } = ws;
+  if (!userId) return false;
+
   const roomId = userToRoom[userId];
 
   // only broadcast this action if user in game and user is still playing
@@ -466,6 +490,8 @@ const playerForfeit = (ws: WebSocket): boolean => {
 
 const playerUnready = (ws: WebSocket): boolean => {
   const { userId } = ws;
+  if (!userId) return false;
+
   const roomId = userToRoom[userId];
 
   if (!roomId || !rooms[roomId] || !rooms[roomId].socketGameState[userId])
@@ -478,6 +504,8 @@ const playerUnready = (ws: WebSocket): boolean => {
 
 const playerReady = (ws: WebSocket): boolean => {
   const { userId } = ws;
+  if (!userId) return false;
+
   const roomId = userToRoom[userId];
 
   if (!roomId || !rooms[roomId] || !rooms[roomId].socketGameState[userId])
@@ -522,44 +550,35 @@ export const handleWebsocketConnection = (ws: WebSocket) => {
         break;
 
       case MessageType.Discussion:
-        console.log('got discussion');
         broadcastDiscussion(ws);
         break;
 
       case MessageType.Failed:
-        console.log('got failed');
         broadcastFailed(ws);
         break;
 
       case MessageType.Finished:
-        console.log('got finished');
         playerFinished(ws);
         break;
 
       case MessageType.Hint:
-        console.log('got hint');
         broadcastHint(ws);
         break;
 
       case MessageType.Message:
         const message: Message = { type, params, ts };
-        console.log('got message', message);
-
         broadcastMessage(ws, message);
         break;
 
       case MessageType.Solutions:
-        console.log('got solutions');
         broadcastSolutions(ws);
         break;
 
       case MessageType.Submit:
-        console.log('got submit');
         playerSubmit(ws);
         break;
 
       case MessageType.Ready:
-        console.log('got ready');
         playerReady(ws);
         break;
 
