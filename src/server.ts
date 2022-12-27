@@ -1,5 +1,4 @@
 import express from 'express';
-import { parse } from 'url';
 import { WebSocketServer } from 'ws';
 import { WebSocket } from './types';
 import { PORT, SOCKET_TIMEOUT } from './consts';
@@ -42,22 +41,5 @@ server.on('upgrade', (request, ws, head) => {
     wss.emit('connection', ws, request);
   });
 });
-
-// server.on('upgrade', (request, ws, head) => {
-//   if (!request.url) {
-//     ws.destroy();
-//     return;
-//   }
-
-//   const { pathname } = parse(request.url);
-
-//   if (pathname === '/ws') {
-//     wss.handleUpgrade(request, ws, head, (ws) => {
-//       wss.emit('connection', ws, request);
-//     });
-//   } else {
-//     ws.destroy();
-//   }
-// });
 
 console.log(`Listening on port ${PORT}...`);
