@@ -6,7 +6,10 @@ import { handleWebsocketConnection, leaveRoom } from './wss-handler';
 import join from './routes/join';
 
 // websocket server
-const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({
+  noServer: true,
+  maxPayload: 5 * 1024, // 5kB
+});
 
 // handles websocket connections/messages
 wss.on('connection', handleWebsocketConnection);
