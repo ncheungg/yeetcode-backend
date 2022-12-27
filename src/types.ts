@@ -1,7 +1,7 @@
 import { WebSocket as WebSocketOld } from 'ws';
 
 export interface WebSocket extends WebSocketOld {
-  userId: string;
+  userId?: string;
   isAlive: boolean;
 }
 
