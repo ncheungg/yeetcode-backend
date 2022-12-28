@@ -9,9 +9,8 @@ import {
   UserGameState,
   UserToRoom,
   Round,
-  Problem,
 } from './types';
-import { MAX_PROBLEM_SIZE, MAX_ROOM_SIZE, PROBLEM_TIME } from './consts';
+import { MAX_ROOM_SIZE, PROBLEM_TIME } from './consts';
 import { getRandomProblem } from './utils';
 
 const rooms: Rooms = {};
@@ -349,7 +348,8 @@ const playerSubmit = (ws: WebSocket): boolean => {
 const startGame = (roomId: string): boolean => {
   if (!roomId || !rooms[roomId]) return false;
 
-  const problem = getRandomProblemForRoom(roomId);
+  const room = rooms[roomId];
+  const problem = getRandomProblem(room);
   if (!problem) return false;
 
   const expiryDate = new Date(new Date().getTime() + PROBLEM_TIME * 60000);
@@ -432,21 +432,6 @@ const endGame = (roomId: string): boolean => {
   broadcastToRoom(roomId, actionMessage);
 
   return true;
-};
-
-const getRandomProblemForRoom = (roomId: string): Problem | undefined => {
-  const room = rooms[roomId];
-
-  if (!room || room.completedProblems.size >= MAX_PROBLEM_SIZE)
-    return undefined;
-
-  let problem: Problem | undefined;
-
-  while (!problem || room.completedProblems.has(problem)) {
-    problem = getRandomProblem();
-  }
-
-  return problem;
 };
 
 const playerForfeit = (ws: WebSocket): boolean => {
