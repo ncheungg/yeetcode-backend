@@ -22,6 +22,7 @@ export enum MessageType {
   StartGame = 'StartGame',
   EndGame = 'EndGame',
   Forfeit = 'Forfeit',
+  UpdateUserState = 'UpdateUserState',
 }
 
 export enum UserGameState {
@@ -38,6 +39,9 @@ export interface MessageParams {
   message?: string;
   problem?: Problem;
   userInfo?: UserInfo;
+  playerStates?: {
+    [userId: string]: UserGameState;
+  };
 }
 
 export interface Message {
