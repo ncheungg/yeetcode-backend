@@ -45,6 +45,61 @@ const broadcastToRoom = (
   return true;
 };
 
+// updates all clients in a room when a player state changes
+const broadcastPlayerStateUpdate = (
+  ws: WebSocket,
+  roomId: string,
+  state: UserGameState
+): boolean => {
+  const { userId } = ws;
+  if (!userId) return false;
+
+  if (!roomId || !rooms[roomId]) return false;
+
+  const updateStateMessage: Message = {
+    type: MessageType.UpdateUserState,
+    params: {
+      playerStates: {
+        [userId]: state,
+      },
+    },
+    ts: new Date(),
+  };
+
+  for (const wsClient of Object.values(rooms[roomId].sockets)) {
+    wsClient.send(JSON.stringify(updateStateMessage));
+  }
+
+  return true;
+};
+
+// updates all clients in a room to change all player states in a room
+const broadcastPlayerStateUpdateAll = (
+  roomId: string,
+  state: UserGameState
+): boolean => {
+  if (!roomId || !rooms[roomId]) return false;
+
+  const playerStates: Record<string, UserGameState> = {};
+  for (const userId in rooms[roomId].sockets) {
+    playerStates[userId] = state;
+  }
+
+  const updateStateMessage: Message = {
+    type: MessageType.UpdateUserState,
+    params: {
+      playerStates,
+    },
+    ts: new Date(),
+  };
+
+  for (const wsClient of Object.values(rooms[roomId].sockets)) {
+    wsClient.send(JSON.stringify(updateStateMessage));
+  }
+
+  return true;
+};
+
 // creates a room, broadcasts action message, sends roomId back to socket
 const createRoom = (ws: WebSocket, params?: MessageParams): boolean => {
   if (!params?.userInfo?.userId) return false;
@@ -65,12 +120,15 @@ const createRoom = (ws: WebSocket, params?: MessageParams): boolean => {
     },
     completedProblems: new Set(),
     socketGameState: {
-      [userId]: UserGameState.Spectating,
+      [userId]: UserGameState.Unready,
     },
     isInGame: false,
   };
   rooms[roomId] = room;
   userToRoom[userId] = roomId;
+
+  // broadcasts this state change to everyone (in this case just themselves)
+  broadcastPlayerStateUpdate(ws, roomId, UserGameState.Unready);
 
   const actionMessage: Message = {
     type: MessageType.Action,
@@ -113,9 +171,13 @@ const joinRoom = (ws: WebSocket, params?: MessageParams): boolean => {
   rooms[roomId].sockets[userId] = ws;
 
   // Unready if game hasn't started yet, spectating if game has started
-  rooms[roomId].socketGameState[userId] = rooms[roomId].isInGame
-    ? UserGameState.Spectating
-    : UserGameState.Unready;
+  if (rooms[roomId].isInGame) {
+    rooms[roomId].socketGameState[userId] = UserGameState.Spectating;
+    broadcastPlayerStateUpdate(ws, roomId, UserGameState.Spectating);
+  } else {
+    rooms[roomId].socketGameState[userId] = UserGameState.Unready;
+    broadcastPlayerStateUpdate(ws, roomId, UserGameState.Unready);
+  }
 
   const actionMessage: Message = {
     type: MessageType.Action,
@@ -240,6 +302,7 @@ const playerFinished = (ws: WebSocket): boolean => {
 
   rooms[roomId].round?.finishedOrder.push(ws);
   rooms[roomId].socketGameState[userId] = UserGameState.Finished;
+  broadcastPlayerStateUpdate(ws, roomId, UserGameState.Finished);
 
   const message: Message = {
     type: MessageType.Action,
@@ -378,6 +441,9 @@ const startGame = (roomId: string): boolean => {
     rooms[roomId].socketGameState[user] = UserGameState.Playing;
   }
 
+  // updates the player states on all clients
+  broadcastPlayerStateUpdateAll(roomId, UserGameState.Playing);
+
   // sends the problem and its details to all users
   const problemMessage: Message = {
     type: MessageType.StartGame,
@@ -415,6 +481,8 @@ const endGame = (roomId: string): boolean => {
     rooms[roomId].socketGameState[user] = UserGameState.Unready;
   }
 
+  broadcastPlayerStateUpdateAll(roomId, UserGameState.Unready);
+
   // sends a message to all sockets to end the game
   const endMessage: Message = {
     type: MessageType.EndGame,
@@ -450,8 +518,9 @@ const playerForfeit = (ws: WebSocket): boolean => {
   )
     return false;
 
-  rooms[roomId].socketGameState[userId] = UserGameState.Forfeited;
   rooms[roomId].round?.forfeited.push(ws);
+  rooms[roomId].socketGameState[userId] = UserGameState.Forfeited;
+  broadcastPlayerStateUpdate(ws, roomId, UserGameState.Forfeited);
 
   const message: Message = {
     type: MessageType.Action,
@@ -483,6 +552,17 @@ const playerUnready = (ws: WebSocket): boolean => {
     return false;
 
   rooms[roomId].socketGameState[userId] = UserGameState.Unready;
+  broadcastPlayerStateUpdate(ws, roomId, UserGameState.Unready);
+
+  // send unready message
+  const unreadyMessage: Message = {
+    type: MessageType.Action,
+    params: {
+      message: `${userId} is not ready`,
+    },
+    ts: new Date(),
+  };
+  broadcastToRoom(roomId, unreadyMessage);
 
   return true;
 };
@@ -497,6 +577,17 @@ const playerReady = (ws: WebSocket): boolean => {
     return false;
 
   rooms[roomId].socketGameState[userId] = UserGameState.Ready;
+  broadcastPlayerStateUpdate(ws, roomId, UserGameState.Ready);
+
+  // send ready message
+  const readyMessage: Message = {
+    type: MessageType.Action,
+    params: {
+      message: `${userId} is ready!`,
+    },
+    ts: new Date(),
+  };
+  broadcastToRoom(roomId, readyMessage);
 
   // start game if every user is ready
   const userStatesArray = Object.values(rooms[roomId].socketGameState);
